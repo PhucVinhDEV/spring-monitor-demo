@@ -1,0 +1,80 @@
+name: spring-monitor-demo
+
+services:
+  springboot-app:
+    image: openjdk:25
+    container_name: springboot-app
+    restart: unless-stopped
+    volumes:
+      - ./springboot-app.jar:/app/springboot-app.jar
+      - ./logs:/app/logs
+    working_dir: /app
+    command: ["java", "-jar", "springboot-app.jar"]
+    ports:
+      - "8080:8080"
+    networks:
+      - monitoring
+  # Prometheus
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus:/etc/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - monitoring
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9090/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  # Loki
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: loki
+    command: -config.file=/etc/loki/local-config.yaml
+    restart: unless-stopped
+    volumes:
+      - ./loki:/etc/loki
+    ports:
+      - "3100:3100"
+    networks:
+      - monitoring
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3100/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Promtail (agent đọc log)
+  promtail:
+    image: grafana/promtail:2.9.0
+    container_name: promtail
+    restart: unless-stopped
+    volumes:
+      - ./logs:/var/log/springboot
+      - ./promtail:/etc/promtail
+    command: -config.file=/etc/promtail/config.yaml
+    networks:
+      - monitoring
+
+  # Grafana
+  grafana:
+    image: grafana/grafana:10.0.0
+    container_name: grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    ports:
+      - "3000:3000"
+    networks:
+      - monitoring
+    depends_on:
+      - prometheus
+      - loki
+
+networks:
+  monitoring:
+    driver: bridge

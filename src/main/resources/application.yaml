@@ -1,0 +1,20 @@
+spring:
+  application:
+    name: spring-monitor-demo
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info,prometheus"
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+logging:
+  file:
+    name: logs/app.log
+  level:
+    root: INFO
